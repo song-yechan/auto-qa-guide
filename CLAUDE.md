@@ -77,6 +77,23 @@ ls auth.json 2>/dev/null || echo "NO_SESSION"
      - `네, 앱 설정 필요` → 앱 이름/설정 방법 추가 질문
    - "네" 선택 시: "어떤 앱에서 테스트하나요? (앱 이름 또는 접근 방법을 알려주세요)"
    - 입력받은 앱 설정은 테스트 코드 beforeEach에 반영
+   - **앱 접근 검증 필수**: 테스트 코드에서 해당 앱에 정확히 접근했는지 자동 검증
+     ```typescript
+     // beforeEach에서 앱 접근 후 검증 로직 추가
+     test.beforeEach(async ({ page }) => {
+       // 1. 앱 목록에서 해당 앱 클릭
+       await page.getByText('{앱이름}').click();
+
+       // 2. 앱 접근 검증 - 현재 앱이 맞는지 확인
+       // (앱 이름이 헤더/사이드바 등에 표시되는지 확인)
+       await expect(page.locator('[data-testid="app-name"]')
+         .or(page.getByRole('heading', { name: '{앱이름}' }))
+         .or(page.locator('.app-header').getByText('{앱이름}'))
+       ).toBeVisible({ timeout: 10000 });
+
+       // 3. 검증 실패 시 테스트 중단 (다른 앱에서 테스트 방지)
+     });
+     ```
 4. **테스트 케이스 질문** - 아래 형식으로 안내:
    ```
    테스트 케이스를 입력해주세요. 형식은 아래가 가장 적합합니다:
