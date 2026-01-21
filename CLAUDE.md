@@ -116,40 +116,57 @@ ls auth.json 2>/dev/null || echo "NO_SESSION"
 6. **테스트 계획 제시** - 구체화된 테스트 케이스 표로 보여주기
 7. **승인 요청** - "이 계획대로 진행할까요?" 묻기
 
-#### Phase 4: 실행
-8. **페이지 구조 파악** - codegen으로 실제 selector 확인 (필요시)
-   ```bash
-   npx playwright codegen "{URL}" --timeout=30000
-   ```
-9. **테스트 코드 작성** - `Tests/{테스트명}/{테스트명}_test_code.spec.ts`
-   - 사용자가 "동작"만 설명해도 이해하고 적절한 테스트 작성
-   - 에러 확인은 정확한 텍스트 대신 **에러 컴포넌트 존재 여부**로 체크
-     ```typescript
-     // 좋은 예: 에러 컴포넌트 존재 여부 확인
-     const errorMessage = page.locator('[role="alert"], [class*="error"]');
-     await expect(errorMessage.first()).toBeVisible();
+#### Phase 3.5: 앱 접근 확인 (앱 환경 설정한 경우만)
+> 특정 앱 환경에서 테스트하는 경우에만 실행
 
-     // 피해야 할 예: 정확한 텍스트 매칭
-     await expect(page.getByText('정확한 에러 메시지')).toBeVisible();
-     ```
-10. **테스트 실행** - `npx playwright test "Tests/{테스트명}" --reporter=html`
+8. **앱 접근 스크린샷 촬영**:
+   ```bash
+   # 브라우저 열어서 앱까지 이동 후 스크린샷
+   npx playwright test --headed --debug
+   # 또는 codegen으로 직접 확인
+   npx playwright codegen "{URL}" --timeout=60000
+   ```
+9. **사용자 확인 요청** - 스크린샷 또는 브라우저 화면을 보여주고:
+   - "현재 {앱이름} 앱에 접근한 화면입니다. 맞는지 확인해주세요."
+   - AskUserQuestion으로 확인:
+     - `네, 맞습니다` → Phase 4로 진행
+     - `아니요, 다른 앱입니다` → 앱 접근 방법 재확인
+10. **확인 완료 후** 테스트 진행
+
+#### Phase 4: 실행
+11. **페이지 구조 파악** - codegen으로 실제 selector 확인 (필요시)
+    ```bash
+    npx playwright codegen "{URL}" --timeout=30000
+    ```
+12. **테스트 코드 작성** - `Tests/{테스트명}/{테스트명}_test_code.spec.ts`
+    - 사용자가 "동작"만 설명해도 이해하고 적절한 테스트 작성
+    - 에러 확인은 정확한 텍스트 대신 **에러 컴포넌트 존재 여부**로 체크
+      ```typescript
+      // 좋은 예: 에러 컴포넌트 존재 여부 확인
+      const errorMessage = page.locator('[role="alert"], [class*="error"]');
+      await expect(errorMessage.first()).toBeVisible();
+
+      // 피해야 할 예: 정확한 텍스트 매칭
+      await expect(page.getByText('정확한 에러 메시지')).toBeVisible();
+      ```
+13. **테스트 실행** - `npx playwright test "Tests/{테스트명}" --reporter=html`
 
 #### Phase 5: 산출물 저장
-11. **리포트 이동** - 실행 후 아래 명령어로 산출물 정리:
+14. **리포트 이동** - 실행 후 아래 명령어로 산출물 정리:
     ```bash
     mv playwright-report "Tests/{테스트명}/report"
     mv test-results "Tests/{테스트명}/results"
     ```
-12. **결과 리포트 작성** - `Tests/{테스트명}/{테스트명}_test_result.md`
+15. **결과 리포트 작성** - `Tests/{테스트명}/{테스트명}_test_result.md`
 
 #### Phase 6: 검증
-13. **HTML 리포트 오픈** - `open "Tests/{테스트명}/report/index.html"`
-14. **확인 완료 질문** - AskUserQuestion 도구로 객관식 선택지 제시:
+16. **HTML 리포트 오픈** - `open "Tests/{테스트명}/report/index.html"`
+17. **확인 완료 질문** - AskUserQuestion 도구로 객관식 선택지 제시:
     - 질문: "확인을 완료하셨으면 다음 동작을 요청해주세요"
     - 선택지:
       - `테스트 완료` → 종료
-      - `UI 모드로 추가 확인` → 15번으로
-15. **UI 모드 실행 (선택)** - 사용자가 "UI 모드로 추가 확인" 선택 시:
+      - `UI 모드로 추가 확인` → 18번으로
+18. **UI 모드 실행 (선택)** - 사용자가 "UI 모드로 추가 확인" 선택 시:
     - 해당 테스트의 UI 모드 직접 실행: `npx playwright test "Tests/{테스트명}" --ui`
 
 ---
