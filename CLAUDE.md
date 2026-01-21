@@ -81,19 +81,21 @@ ls auth.json 2>/dev/null || echo "NO_SESSION"
      ```typescript
      // beforeEach에서 앱 접근 후 검증 로직 추가
      test.beforeEach(async ({ page }) => {
+       await page.goto('/');
+
        // 1. 앱 목록에서 해당 앱 클릭
-       await page.getByText('{앱이름}').click();
+       await page.getByRole('link', { name: '{앱이름}' }).click();
 
        // 2. 앱 접근 검증 - 현재 앱이 맞는지 확인
-       // (앱 이름이 헤더/사이드바 등에 표시되는지 확인)
-       await expect(page.locator('[data-testid="app-name"]')
+       // (앱 진입 후 앱 이름이 표시되는 버튼/헤더 등 확인)
+       await expect(page.getByRole('button', { name: '{앱이름} {앱이름}' })
          .or(page.getByRole('heading', { name: '{앱이름}' }))
-         .or(page.locator('.app-header').getByText('{앱이름}'))
        ).toBeVisible({ timeout: 10000 });
 
-       // 3. 검증 실패 시 테스트 중단 (다른 앱에서 테스트 방지)
+       // 3. 검증 실패 시 테스트 자동 실패 → 다른 앱 데이터 보호
      });
      ```
+   - **검증 selector 확인 방법**: codegen으로 앱 진입 후 앱 이름이 표시되는 요소의 selector 확인
 4. **테스트 케이스 질문** - 아래 형식으로 안내:
    ```
    테스트 케이스를 입력해주세요. 형식은 아래가 가장 적합합니다:
