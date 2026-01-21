@@ -127,19 +127,23 @@ ls auth.json 2>/dev/null || echo "NO_SESSION"
 
 #### Phase 3.5: 앱 접근 확인 (앱 환경 설정한 경우만)
 > 특정 앱 환경에서 테스트하는 경우에만 실행
+> **목적**: 본 테스트 실행 전에 올바른 앱에 접근하는지 사용자가 직접 확인
 
-8. **앱 접근 테스트 실행**:
-   - 앱 접근 확인용 임시 테스트 코드 작성 및 실행 (`--headed` + `page.pause()`)
+8. **앱 접근 테스트 작성 및 실행** (`--headed` 모드):
+   ```bash
+   npx playwright test "Tests/{테스트명}/앱접근테스트.spec.ts" --headed
+   ```
+
    ```typescript
-   // 앱접근테스트.spec.ts
+   // Tests/{테스트명}/앱접근테스트.spec.ts
    const APP_NAME = '{대시보드표기이름}';
 
    test('앱 접근 확인', async ({ page }) => {
      await page.goto('/');
 
      // 앱 목록 확인 (로그인 상태)
-     const appListHeading = page.getByRole('heading', { name: '앱 목록' });
-     await expect(appListHeading).toBeVisible({ timeout: 10000 });
+     await expect(page.getByRole('heading', { name: '앱 목록' }))
+       .toBeVisible({ timeout: 10000 });
 
      // 앱 링크 존재 여부 확인
      const appLink = page.getByRole('link', { name: APP_NAME });
@@ -164,24 +168,26 @@ ls auth.json 2>/dev/null || echo "NO_SESSION"
 9. **결과에 따른 처리**:
    - **앱이 없는 경우** (테스트 실패):
      - 사용자에게 알림: "'{앱이름}' 앱을 앱 목록에서 찾을 수 없습니다."
-     - 대시보드 표기 이름 다시 요청
+     - 대시보드 표기 이름 다시 요청 → 8번부터 재시도
 
-   - **앱이 있는 경우** (테스트 성공, 브라우저 창 열린 상태):
+   - **앱이 있는 경우** (브라우저 창 열린 상태):
      - AskUserQuestion으로 확인:
        - 질문: "현재 화면이 '{앱이름}' 앱이 맞나요?"
        - 선택지:
-         - `네, 맞습니다` → "확인되었습니다. Inspector 창의 Resume 버튼을 누르거나 창을 닫으면 테스트가 진행됩니다." 안내 후 Phase 4로 진행
-         - `아니요, 다른 앱입니다` → "대시보드에 표기된 정확한 앱 이름을 다시 입력해주세요." 요청 후 8번부터 재시도
+         - `네, 맞습니다` → 안내: "확인되었습니다. **Inspector 창을 닫아주세요.** 창을 닫으면 본 테스트가 진행됩니다."
+         - `아니요, 다른 앱입니다` → 대시보드 표기 이름 다시 요청 → 8번부터 재시도
 
-10. **확인 완료 후** 본 테스트 진행
+10. **사용자가 창을 닫으면** → Phase 4 (본 테스트) 진행
 
-#### Phase 4: 실행
+#### Phase 4: 실행 (Headless 모드)
+> **중요**: 본 테스트는 headless 모드(브라우저 창 없이)로 실행됨
+
 11. **페이지 구조 파악** - codegen으로 실제 selector 확인 (필요시)
     ```bash
-    npx playwright codegen "{URL}" --timeout=30000
+    npx playwright codegen "{URL}" --load-storage=auth.json --timeout=30000
     ```
 12. **테스트 코드 작성** - `Tests/{테스트명}/{테스트명}_test_code.spec.ts`
-    - 사용자가 "동작"만 설명해도 이해하고 적절한 테스트 작성
+    - 앱 환경 설정한 경우: beforeEach에 앱 진입 로직 포함
     - 에러 확인은 정확한 텍스트 대신 **에러 컴포넌트 존재 여부**로 체크
       ```typescript
       // 좋은 예: 에러 컴포넌트 존재 여부 확인
@@ -191,7 +197,11 @@ ls auth.json 2>/dev/null || echo "NO_SESSION"
       // 피해야 할 예: 정확한 텍스트 매칭
       await expect(page.getByText('정확한 에러 메시지')).toBeVisible();
       ```
-13. **테스트 실행** - `npx playwright test "Tests/{테스트명}" --reporter=html`
+13. **테스트 실행** (headless 모드 - 브라우저 창 표시 안 함):
+    ```bash
+    npx playwright test "Tests/{테스트명}" --reporter=html
+    ```
+    - `--headed` 옵션 **없이** 실행 → 백그라운드에서 빠르게 테스트 진행
 
 #### Phase 5: 산출물 저장
 14. **리포트 이동** - 실행 후 아래 명령어로 산출물 정리:
