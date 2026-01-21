@@ -128,19 +128,52 @@ ls auth.json 2>/dev/null || echo "NO_SESSION"
 #### Phase 3.5: 앱 접근 확인 (앱 환경 설정한 경우만)
 > 특정 앱 환경에서 테스트하는 경우에만 실행
 
-8. **앱 접근 스크린샷 촬영**:
-   ```bash
-   # 브라우저 열어서 앱까지 이동 후 스크린샷
-   npx playwright test --headed --debug
-   # 또는 codegen으로 직접 확인
-   npx playwright codegen "{URL}" --timeout=60000
+8. **앱 접근 테스트 실행**:
+   - 앱 접근 확인용 임시 테스트 코드 작성 및 실행 (`--headed` + `page.pause()`)
+   ```typescript
+   // 앱접근테스트.spec.ts
+   const APP_NAME = '{대시보드표기이름}';
+
+   test('앱 접근 확인', async ({ page }) => {
+     await page.goto('/');
+
+     // 앱 목록 확인 (로그인 상태)
+     const appListHeading = page.getByRole('heading', { name: '앱 목록' });
+     await expect(appListHeading).toBeVisible({ timeout: 10000 });
+
+     // 앱 링크 존재 여부 확인
+     const appLink = page.getByRole('link', { name: APP_NAME });
+     const appExists = await appLink.isVisible().catch(() => false);
+
+     if (!appExists) {
+       throw new Error(`앱을 찾을 수 없습니다: "${APP_NAME}"`);
+     }
+
+     // 앱 클릭하여 진입
+     await appLink.click();
+
+     // 앱 진입 검증
+     await expect(page.getByRole('button', { name: `${APP_NAME} ${APP_NAME}` }))
+       .toBeVisible({ timeout: 10000 });
+
+     // 사용자 확인을 위해 일시정지 (창 유지)
+     await page.pause();
+   });
    ```
-9. **사용자 확인 요청** - 스크린샷 또는 브라우저 화면을 보여주고:
-   - "현재 {앱이름} 앱에 접근한 화면입니다. 맞는지 확인해주세요."
-   - AskUserQuestion으로 확인:
-     - `네, 맞습니다` → Phase 4로 진행
-     - `아니요, 다른 앱입니다` → 앱 접근 방법 재확인
-10. **확인 완료 후** 테스트 진행
+
+9. **결과에 따른 처리**:
+   - **앱이 없는 경우** (테스트 실패):
+     - 사용자에게 알림: "'{앱이름}' 앱을 앱 목록에서 찾을 수 없습니다."
+     - 대시보드 표기 이름 다시 요청
+
+   - **앱이 있는 경우** (테스트 성공, 브라우저 창 열린 상태):
+     - AskUserQuestion으로 확인:
+       - 질문: "현재 화면이 '{앱이름}' 앱이 맞나요?"
+       - 선택지:
+         - `네, 맞습니다` → "확인되었습니다. Inspector 창의 Resume 버튼을 누르거나 창을 닫으면 테스트가 진행됩니다." 안내 후 Phase 4로 진행
+         - `아니요, 다른 앱입니다` → "대시보드에 표기된 정확한 앱 이름을 다시 입력해주세요." 요청 후 8번부터 재시도
+
+10. **확인 완료 후** 본 테스트 진행
 
 #### Phase 4: 실행
 11. **페이지 구조 파악** - codegen으로 실제 selector 확인 (필요시)
