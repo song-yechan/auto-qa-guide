@@ -1,6 +1,11 @@
 # 로그인 세션 (보안)
 auth.json
 
+# 웹 구조 문서 (내부 정보, 로컬 전용)
+*-web-structure.md
+WEB-STRUCTURE.md
+STRUCTURE-DIFF.md
+
 # Node.js
 node_modules/
 
