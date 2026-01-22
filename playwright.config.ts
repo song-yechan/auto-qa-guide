@@ -17,7 +17,7 @@ export default defineConfig({
   // 기본 설정
   use: {
     // baseURL - QA 테스트 시 자동 업데이트됨
-    baseURL: 'https://abrge-app-git-feature-abrfe-2100-ab180.vercel.app',
+    baseURL: 'https://abrge-app-git-feature-abro-2553-ab180.vercel.app',
 
     // 저장된 로그인 세션 사용
     storageState: 'auth.json',
