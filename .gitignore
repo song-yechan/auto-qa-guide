@@ -1,0 +1,16 @@
+# 로그인 세션 (보안)
+auth.json
+
+# Node.js
+node_modules/
+
+# Playwright 전역 산출물 (테스트별 폴더에 저장됨)
+playwright-report/
+test-results/
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
