@@ -587,3 +587,116 @@ Claude Code가 설치되지 않은 경우입니다. 담당자에게 문의하세
    동작: 비밀번호 찾기 링크 클릭
    확인: 비밀번호 찾기 페이지로 이동
 ```
+
+---
+
+## 별첨 C: AutoPilot 시스템 (고급)
+
+> DOM 기반 자동화 시스템으로, 실시간 페이지 상태를 분석하여 자동으로 테스트를 진행합니다.
+
+### AutoPilot이란?
+
+기존 방식은 정적인 웹 구조 문서에 의존했지만, AutoPilot은 **실시간으로 DOM을 분석**하여 다음 행동을 결정합니다.
+
+```
+기존: 웹 구조 문서 → 추론 → 실행 → 에러 → 수정
+AutoPilot: DOM 분석 → 상태 파악 → 행동 결정 → 실행 → 반복
+```
+
+### 주요 장점
+
+| 항목 | 기존 방식 | AutoPilot |
+|------|----------|-----------|
+| UI 변경 대응 | 문서 업데이트 필요 | 자동 대응 |
+| 버튼 비활성화 | 에러 후 파악 | 사전 분석 |
+| 필수 필드 | 문서에 의존 | 자동 감지 |
+| 사용자 개입 | 자주 필요 | 최소화 |
+
+### 사용 예시
+
+테스트 코드에서 직접 사용할 수 있습니다:
+
+```typescript
+import { AutoPilot } from '../../lib';
+
+test('트래킹 링크 생성', async ({ page }) => {
+  // 페이지 이동 후...
+
+  const pilot = new AutoPilot(page, {
+    maxSteps: 15,
+    verbose: true
+  });
+
+  const result = await pilot.execute({
+    name: '트래킹 링크 생성',
+    targetButton: '링크 생성',
+    successIndicator: '/done/'
+  });
+
+  expect(result.success).toBe(true);
+});
+```
+
+### AutoPilot 모듈 구조
+
+```
+lib/analyzer/
+├── page-state-analyzer.ts   # 페이지 상태 추출
+├── action-decider.ts        # 행동 결정 로직
+├── auto-pilot.ts            # 자동화 루프
+└── index.ts
+```
+
+### 상태 분석 기능
+
+AutoPilot은 다음 정보를 실시간으로 추출합니다:
+
+- **버튼**: 텍스트, 활성화/비활성화 상태, 셀렉터
+- **입력 필드**: 이름, 타입, 값, 필수 여부, 셀렉터
+- **모달**: 열림 상태, 내부 버튼/입력 필드
+- **에러 메시지**: 타입, 내용
+- **폼 상태**: 유효성, 비어있는 필수 필드
+
+### 버튼 비활성화 원인 분석
+
+```typescript
+const pilot = new AutoPilot(page);
+const reasons = await pilot.analyzeButton('링크 생성');
+// ["비어있는 필수 필드: 채널, 웹 URL"]
+```
+
+### 현재 페이지 상태 확인
+
+```typescript
+const pilot = new AutoPilot(page);
+console.log(await pilot.getReadableState());
+```
+
+출력 예시:
+```
+## 페이지 상태: 트래킹 링크 생성
+URL: https://example.vercel.app/link/create
+
+### 현재 탭: 커스텀 채널
+
+### 입력 필드
+- 채널 [text]: 비어있음
+  셀렉터: [aria-label="트래킹 링크를 사용할 채널..."]
+- 웹 URL [text]: 비어있음
+  셀렉터: [aria-label="유저를 보낼 웹 페이지..."]
+
+### 버튼
+- 링크 생성: 비활성화
+  셀렉터: button:has-text("링크 생성")
+
+### 폼 상태 요약
+- 유효성: 미통과
+- 비어있는 필수 필드: 채널, 웹 URL
+- 제출 버튼: "링크 생성" (비활성화)
+```
+
+### 주의사항
+
+- AutoPilot은 **개발/테스트 용도**입니다
+- 복잡한 조건부 UI 로직은 완벽히 처리하지 못할 수 있습니다
+- 결과를 반드시 검증하세요

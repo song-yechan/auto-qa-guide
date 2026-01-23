@@ -516,6 +516,99 @@ await page.getByText('트래킹 링크 관리').click();
 
 ---
 
+## AutoPilot 시스템 (DOM 기반 자동화)
+
+> 실시간 DOM 분석을 통해 Vercel 환경 변화에 자동 대응하는 시스템
+
+### 1. AutoPilot이란?
+
+정적 웹 구조 문서 대신 **실시간 DOM 분석**으로 페이지 상태를 파악하고 자동으로 다음 행동을 결정합니다.
+
+```
+기존: 웹 구조 문서 → 추론 → 실행 → 에러 → 수정
+AutoPilot: DOM 분석 → 상태 파악 → 행동 결정 → 실행 → 반복
+```
+
+### 2. 언제 사용하나?
+
+| 상황 | 권장 방식 |
+|------|----------|
+| 정적이고 안정적인 페이지 | 기존 방식 (웹 구조 문서 + codegen) |
+| Vercel preview처럼 자주 바뀌는 환경 | **AutoPilot** |
+| 버튼이 왜 비활성화인지 모를 때 | **AutoPilot** (상태 분석) |
+| 복잡한 폼 (여러 필드, 조건부 활성화) | **AutoPilot** |
+
+### 3. 사용 방법
+
+#### 기본 사용
+
+```typescript
+import { AutoPilot } from '../../lib';
+
+const pilot = new AutoPilot(page, {
+  maxSteps: 15,
+  verbose: true
+});
+
+const result = await pilot.execute({
+  name: '트래킹 링크 생성',
+  targetButton: '링크 생성',
+  successIndicator: '/done/'
+});
+```
+
+#### 상태 분석만 (디버깅)
+
+```typescript
+import { PageStateAnalyzer } from '../../lib';
+
+const analyzer = new PageStateAnalyzer(page);
+const state = await analyzer.analyze();
+
+console.log('입력 필드:', state.inputs);
+console.log('버튼:', state.buttons);
+console.log('비어있는 필수 필드:', state.forms[0].emptyRequiredFields);
+```
+
+#### 버튼 비활성화 원인 분석
+
+```typescript
+const pilot = new AutoPilot(page);
+const reasons = await pilot.analyzeButton('링크 생성');
+// ["비어있는 필수 필드: 채널, 웹 URL"]
+```
+
+### 4. 모듈 구조
+
+```
+lib/analyzer/
+├── page-state-analyzer.ts   # 페이지 상태 추출
+├── action-decider.ts        # 행동 결정 로직
+├── auto-pilot.ts            # 자동화 루프
+└── index.ts
+```
+
+### 5. 기존 모듈과 통합
+
+AutoPilot은 기존 오케스트레이션 모듈과 함께 사용할 수 있습니다:
+
+```typescript
+import {
+  AutoPilot,          // DOM 기반 자동화
+  TestHelper,         // 기존 헬퍼
+  ModalHandler,       // 모달 처리
+  DOMExplorer         // 셀렉터 탐색
+} from '../../lib';
+```
+
+### 6. 주의사항
+
+- AutoPilot은 **보조 도구**입니다. 완전 자동화를 보장하지 않습니다.
+- 복잡한 조건부 로직은 여전히 수동 확인이 필요할 수 있습니다.
+- 결과를 반드시 검증하세요.
+
+---
+
 ## 주의사항
 
 1. **운영계 영향 금지** - 저장/수정 동작 절대 금지 (명시적 요청 없으면)

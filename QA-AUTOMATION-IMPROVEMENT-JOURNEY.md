@@ -639,6 +639,7 @@ async function validateSitemapPath(path: string): Promise<boolean> {
 | 1.8 | 2026-01-22 | 개선 여정 문서화 |
 | 1.9 | 2026-01-22 | 웹 구조 문서 활용 시스템 추가 |
 | 2.0 | 2026-01-22 | 트래킹 링크 생성 테스트 시도 및 근본적 한계 분석 |
+| 2.1 | 2026-01-22 | DOM 기반 자동화 시스템 (AutoPilot) 구축 |
 
 ---
 
@@ -769,6 +770,180 @@ Tests/트래킹 링크 생성/
 - 스크린샷 기반 접근 방식 구현
 - 웹 구조 문서에 폼 유효성 검증 규칙 추가
 - 또는 codegen으로 전체 플로우 먼저 기록 후 테스트 작성
+
+---
+
+## 10. DOM 기반 자동화 시스템 구축 - AutoPilot (2026-01-22)
+
+### 10.1 배경
+
+사용자 피드백:
+> "사용자가 계속 캡쳐하면서 움직여야 하잖아 이건 말도 안되는거야. 목표는 자동화야"
+
+스크린샷 기반 접근은 여전히 사용자 개입이 필요했음. 진정한 자동화를 위해 DOM 기반 접근 방식 채택.
+
+### 10.2 핵심 아이디어
+
+```
+정적 문서 의존 → 실시간 DOM 분석으로 전환
+```
+
+**Vercel preview 환경의 특성**:
+- 매번 UI가 바뀔 수 있음
+- 정적 웹 구조 문서는 금방 outdated
+- 실시간으로 페이지 상태를 파악해야 함
+
+### 10.3 시스템 아키텍처
+
+```
+┌─────────────────────┐
+│    AutoPilot        │  ← 자동화 루프 실행
+│  (루프 컨트롤러)     │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│   ActionDecider     │  ← 상태 기반 행동 결정
+│  (행동 결정기)       │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ PageStateAnalyzer   │  ← 실시간 DOM 분석
+│  (상태 분석기)       │
+└─────────────────────┘
+```
+
+### 10.4 각 모듈 상세
+
+#### PageStateAnalyzer
+
+**역할**: 현재 페이지의 전체 상태를 구조화된 형태로 추출
+
+**추출 정보**:
+```typescript
+interface PageState {
+  url: string;
+  title: string;
+  buttons: ButtonState[];     // 모든 버튼과 활성화 상태
+  inputs: InputState[];       // 모든 입력 필드와 값
+  alerts: AlertState[];       // 에러/경고 메시지
+  modals: ModalState[];       // 열린 모달
+  forms: FormState[];         // 폼 유효성 상태
+  activeTab?: string;         // 현재 선택된 탭
+}
+```
+
+**핵심 기능**:
+- 버튼 비활성화 원인 분석
+- 비어있는 필수 필드 감지
+- 에러 메시지 추출
+
+#### ActionDecider
+
+**역할**: 현재 상태와 목표를 비교하여 다음 행동 결정
+
+**행동 타입**:
+```typescript
+type ActionType =
+  | 'fill'      // 입력 필드 채우기
+  | 'click'     // 버튼 클릭
+  | 'select'    // 드롭다운 선택
+  | 'escape'    // 모달 닫기
+  | 'tab'       // blur 이벤트 발생
+  | 'done'      // 목표 달성
+  | 'blocked'   // 진행 불가
+  | 'explore';  // 추가 탐색 필요
+```
+
+**필드 자동 입력 전략**:
+```typescript
+// 패턴 매칭으로 적절한 값 생성
+채널 필드 → "테스트_채널_" + timestamp
+URL 필드  → "https://example.com/test"
+이름 필드 → "테스트_" + timestamp
+```
+
+#### AutoPilot
+
+**역할**: 자동화 루프 실행 및 결과 리포트
+
+**실행 흐름**:
+```
+1. 목표 설정 (targetButton, successIndicator)
+2. 반복 시작:
+   a. PageStateAnalyzer로 현재 상태 추출
+   b. ActionDecider로 다음 행동 결정
+   c. 행동 실행
+   d. 결과 확인
+3. 목표 달성 또는 최대 단계 도달 시 종료
+4. 실행 결과 리포트 반환
+```
+
+### 10.5 사용 예시
+
+```typescript
+import { AutoPilot } from '../../lib';
+
+const pilot = new AutoPilot(page, {
+  maxSteps: 15,
+  stepDelay: 800,
+  verbose: true
+});
+
+const result = await pilot.execute({
+  name: '트래킹 링크 생성',
+  targetButton: '링크 생성',
+  successIndicator: '/done/'
+});
+
+if (result.success) {
+  console.log('목표 달성!');
+} else {
+  console.log('실패 원인:', result.error);
+  console.log('실행 단계:', result.steps);
+}
+```
+
+### 10.6 이전 방식과 비교
+
+| 항목 | 이전 (웹 구조 문서) | 이후 (AutoPilot) |
+|------|-------------------|-----------------|
+| 정보 소스 | 정적 문서 | 실시간 DOM |
+| 셀렉터 탐색 | 추측 + codegen | 동적 분석 |
+| 버튼 상태 | 에러 후 파악 | 사전 분석 |
+| 필수 필드 | 문서에 의존 | 자동 감지 |
+| 사용자 개입 | 자주 필요 | 최소화 |
+| Vercel 변화 대응 | 어려움 | 자동 대응 |
+
+### 10.7 파일 구조
+
+```
+lib/
+├── analyzer/                     ← 신규 추가
+│   ├── page-state-analyzer.ts   # 페이지 상태 추출
+│   ├── action-decider.ts        # 행동 결정 로직
+│   ├── auto-pilot.ts            # 자동화 루프
+│   └── index.ts                 # 통합 export
+├── explorer/
+├── modal/
+├── data/
+├── flow/
+├── utils/
+└── index.ts                     # 전체 export
+```
+
+### 10.8 한계 및 향후 개선
+
+**현재 한계**:
+- 복잡한 조건부 UI 로직은 여전히 파악 어려움
+- 드롭다운 옵션 선택 로직 미완성
+- 다단계 폼 (wizard) 지원 필요
+
+**향후 개선 방향**:
+- 더 정교한 필드 자동 입력 전략
+- 학습 기반 패턴 인식 (반복 실행 시 학습)
+- 실패 케이스 자동 분석 및 리포트
 
 ---
 
