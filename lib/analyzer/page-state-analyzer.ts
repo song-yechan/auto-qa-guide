@@ -194,9 +194,16 @@ export class PageStateAnalyzer {
         }
 
         // 필수 여부 판단 (여러 방법으로)
-        const required = htmlEl.required ||
-          htmlEl.getAttribute('aria-required') === 'true' ||
-          !!document.querySelector(`label[for="${htmlEl.id}"] .required, label[for="${htmlEl.id}"] *:has-text("*")`);
+        let required = htmlEl.required || htmlEl.getAttribute('aria-required') === 'true';
+
+        // label 내 필수 표시 확인 (id가 있는 경우만)
+        if (!required && htmlEl.id) {
+          const labelEl = document.querySelector(`label[for="${htmlEl.id}"]`);
+          if (labelEl) {
+            const labelText = labelEl.textContent || '';
+            required = labelText.includes('*') || !!labelEl.querySelector('.required');
+          }
+        }
 
         inputs.push({
           name: label || ariaLabel || placeholder || name || `input-${index}`,
@@ -222,24 +229,77 @@ export class PageStateAnalyzer {
   async extractAlerts(): Promise<AlertState[]> {
     return this.page.evaluate(() => {
       const alerts: any[] = [];
+      const seen = new Set<string>();
 
-      // role="alert" 요소
-      document.querySelectorAll('[role="alert"], [role="alertdialog"], [class*="error"], [class*="Error"], [class*="warning"], [class*="Warning"], [class*="success"], [class*="Success"]').forEach(el => {
+      // 1. role="alert" 요소
+      document.querySelectorAll('[role="alert"], [role="alertdialog"]').forEach(el => {
         const rect = (el as HTMLElement).getBoundingClientRect();
         if (rect.width === 0) return;
 
         const text = (el.textContent || '').trim();
-        if (!text) return;
+        if (!text || seen.has(text)) return;
+        seen.add(text);
 
-        let type: 'error' | 'warning' | 'info' | 'success' = 'info';
+        alerts.push({
+          type: 'error' as const,
+          message: text.slice(0, 200),
+          visible: true
+        });
+      });
+
+      // 2. Material Icon 에러 (error_outline, warning, error 등)
+      document.querySelectorAll('*').forEach(el => {
+        const text = (el.textContent || '').trim();
+        if (text.startsWith('error_outline') || text.startsWith('error') || text.startsWith('warning')) {
+          // 아이콘 + 메시지 패턴
+          const rect = (el as HTMLElement).getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) return;
+
+          // 너무 긴 텍스트는 컨테이너일 가능성 높음
+          if (text.length > 300) return;
+
+          // 이미 추가된 메시지 제외
+          if (seen.has(text)) return;
+          seen.add(text);
+
+          let type: 'error' | 'warning' | 'info' | 'success' = 'error';
+          if (text.startsWith('warning')) {
+            type = 'warning';
+          }
+
+          // 아이콘 텍스트 제거하고 실제 메시지만 추출
+          const message = text
+            .replace(/^error_outline/, '')
+            .replace(/^error/, '')
+            .replace(/^warning/, '')
+            .trim();
+
+          if (message) {
+            alerts.push({
+              type,
+              message: message.slice(0, 200),
+              visible: true
+            });
+          }
+        }
+      });
+
+      // 3. class에 error/warning 포함된 요소
+      document.querySelectorAll('[class*="error"], [class*="Error"], [class*="warning"], [class*="Warning"]').forEach(el => {
+        const rect = (el as HTMLElement).getBoundingClientRect();
+        if (rect.width === 0) return;
+
+        const text = (el.textContent || '').trim();
+        if (!text || text.length > 300 || seen.has(text)) return;
+        seen.add(text);
+
         const className = el.className.toString().toLowerCase();
+        let type: 'error' | 'warning' | 'info' | 'success' = 'info';
 
-        if (className.includes('error') || el.getAttribute('role') === 'alert') {
+        if (className.includes('error')) {
           type = 'error';
         } else if (className.includes('warning')) {
           type = 'warning';
-        } else if (className.includes('success')) {
-          type = 'success';
         }
 
         alerts.push({
